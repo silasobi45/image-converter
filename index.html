@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Densitometer — Image Converter</title>
+<style>
+  @font-face {
+    font-family: 'system-serif';
+    src: local('Iowan Old Style'), local('Palatino Linotype'), local('Georgia');
+  }
+
+  :root{
+    --paper:#EDE7D8;
+    --paper-dim:#c9c3b2;
+    --black:#141210;
+    --panel:#1c1a16;
+    --panel-2:#242019;
+    --line: #3a352b;
+    --safelight:#c1443b;
+    --safelight-dim:#7a3129;
+    --amber:#d99a3c;
+    --ok:#7a9a6a;
+  }
+
+  *{ box-sizing:border-box; }
+
+  html,body{
+    margin:0;
+    background:var(--black);
+    color:var(--paper);
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    min-height:100vh;
+  }
+
+  body{
+    background-image:
+      radial-gradient(circle at 15% 10%, rgba(193,68,59,0.06), transparent 40%),
+      radial-gradient(circle at 85% 90%, rgba(217,154,60,0.05), transparent 45%);
+  }
+
+  .wrap{
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    border-bottom:1px solid var(--line);
+    padding-bottom:22px;
+    margin-bottom:36px;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+
+  h1{
+    font-family: 'system-serif', Georgia, serif;
+    font-weight:400;
+    font-size: 2.1rem;
+    letter-spacing:0.01em;
+    margin:0;
+    color:var(--paper);
+  }
+
+  h1 span{ color:var(--safelight); font-style:italic; }
+
+  header p{
+    margin:0;
+    color:var(--paper-dim);
+    font-size:0.9rem;
+    max-width:260px;
+    text-align:right;
+    line-height:1.5;
+  }
+
+  .stage{
+    display:grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap:28px;
+  }
+
+  @media (max-width: 760px){
+    .stage{ grid-template-columns: 1fr; }
+    header p{ text-align:left; }
+  }
+
+  /* --- Dropzone / preview --- */
+  .frame{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:2px;
+    padding:18px;
+    display:flex;
+    flex-direction:column;
+    min-height: 420px;
+  }
+
+  .drop{
+    flex:1;
+    border:1px dashed var(--line);
+    border-radius:2px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+    cursor:pointer;
+    position:relative;
+    overflow:hidden;
+    background:
+      repeating-linear-gradient(45deg, transparent, transparent 9px, rgba(255,255,255,0.015) 9px, rgba(255,255,255,0.015) 10px);
+    transition: border-color 0.15s ease;
+  }
+
+  .drop.drag{
+    border-color: var(--safelight);
+    background: rgba(193,68,59,0.06);
+  }
+
+  .drop .hint{
+    padding: 40px 20px;
+    color: var(--paper-dim);
+  }
+
+  .drop .hint .big{
+    font-family:'system-serif', Georgia, serif;
+    font-style:italic;
+    font-size:1.15rem;
+    color:var(--paper);
+    display:block;
+    margin-bottom:8px;
+  }
+
+  .drop img{
+    max-width:100%;
+    max-height:420px;
+    display:block;
+    margin:auto;
+    object-fit:contain;
+  }
+
+  input[type=file]{ display:none; }
+
+  .frame-foot{
+    display:flex;
+    justify-content:space-between;
+    font-size:0.78rem;
+    color:var(--paper-dim);
+    padding-top:12px;
+    border-top:1px solid var(--line);
+    margin-top:14px;
+  }
+
+  .frame-foot b{ color:var(--paper); font-weight:600; }
+
+  /* --- Controls panel --- */
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:2px;
+    padding:22px;
+    display:flex;
+    flex-direction:column;
+    gap:22px;
+  }
+
+  .field label{
+    display:flex;
+    justify-content:space-between;
+    font-size:0.82rem;
+    color:var(--paper-dim);
+    margin-bottom:8px;
+  }
+
+  .field label b{ color:var(--paper); font-weight:600; }
+
+  .formats{
+    display:grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap:8px;
+  }
+
+  .formats button{
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    color:var(--paper-dim);
+    padding:10px 4px;
+    font-size:0.82rem;
+    border-radius:2px;
+    cursor:pointer;
+    transition: all 0.12s ease;
+  }
+
+  .formats button.active{
+    border-color: var(--safelight);
+    color: var(--paper);
+    background: rgba(193,68,59,0.12);
+  }
+
+  input[type=range]{
+    -webkit-appearance:none;
+    width:100%;
+    height:2px;
+    background: var(--line);
+    outline:none;
+    margin: 14px 0 4px;
+  }
+
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:14px; height:14px;
+    border-radius:50%;
+    background: var(--safelight);
+    cursor:pointer;
+    border:2px solid var(--panel);
+    box-shadow:0 0 0 1px var(--safelight);
+  }
+  input[type=range]::-moz-range-thumb{
+    width:14px; height:14px;
+    border-radius:50%;
+    background: var(--safelight);
+    cursor:pointer;
+    border:2px solid var(--panel);
+  }
+
+  .dims{
+    display:grid;
+    grid-template-columns: 1fr 16px 1fr;
+    gap:8px;
+    align-items:center;
+  }
+
+  .dims input{
+    width:100%;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    color:var(--paper);
+    padding:9px 10px;
+    font-size:0.88rem;
+    border-radius:2px;
+  }
+  .dims input:focus{ outline:none; border-color:var(--amber); }
+  .dims .x{ text-align:center; color:var(--paper-dim); }
+
+  .lockrow{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-size:0.78rem;
+    color:var(--paper-dim);
+    margin-top:8px;
+  }
+  .lockrow input{ accent-color: var(--safelight); }
+
+  .compare{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    background: var(--panel-2);
+    border:1px solid var(--line);
+    padding:14px 16px;
+    border-radius:2px;
+  }
+
+  .compare .size{ text-align:center; }
+  .compare .size .n{
+    font-size:1.3rem;
+    font-family:'system-serif', Georgia, serif;
+  }
+  .compare .size .l{
+    font-size:0.7rem;
+    color:var(--paper-dim);
+    text-transform:uppercase;
+    letter-spacing:0.06em;
+  }
+  .compare .arrow{ color: var(--safelight); font-size:1.1rem; }
+  .compare .size.after .n{ color: var(--ok); }
+  .compare .delta{
+    font-size:0.72rem;
+    color: var(--paper-dim);
+  }
+
+  button.go{
+    background: var(--safelight);
+    color: var(--paper);
+    border:none;
+    padding:14px;
+    font-size:0.95rem;
+    border-radius:2px;
+    cursor:pointer;
+    font-weight:600;
+    letter-spacing:0.01em;
+    transition: background 0.12s ease;
+  }
+  button.go:hover{ background:#a83a32; }
+  button.go:disabled{
+    background: var(--line);
+    color: var(--paper-dim);
+    cursor:not-allowed;
+  }
+
+  .note{
+    font-size:0.75rem;
+    color:var(--paper-dim);
+    line-height:1.5;
+  }
+
+  a.dl{
+    display:none;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <header>
+    <h1>Densi<span>tometer</span></h1>
+    <p>Convert formats and dial in file size, right here — nothing leaves your browser.</p>
+  </header>
+
+  <div class="stage">
+
+    <div class="frame">
+      <div class="drop" id="drop">
+        <div class="hint" id="hint">
+          <span class="big">Drop an image</span>
+          or click to browse — JPG, PNG, WebP, GIF
+        </div>
+        <img id="preview" style="display:none;">
+      </div>
+      <div class="frame-foot">
+        <span>Original: <b id="origInfo">—</b></span>
+        <span id="origDims">—</span>
+      </div>
+      <input type="file" id="fileInput" accept="image/*">
+    </div>
+
+    <div class="panel">
+
+      <div class="field">
+        <label><b>Format</b></label>
+        <div class="formats" id="formats">
+          <button data-fmt="image/jpeg" class="active">JPEG</button>
+          <button data-fmt="image/webp">WebP</button>
+          <button data-fmt="image/png">PNG</button>
+        </div>
+      </div>
+
+      <div class="field" id="qualityField">
+        <label>Quality <b id="qVal">80%</b></label>
+        <input type="range" id="quality" min="1" max="100" value="80">
+      </div>
+
+      <div class="field">
+        <label>Dimensions</label>
+        <div class="dims">
+          <input type="number" id="wIn" placeholder="width">
+          <span class="x">×</span>
+          <input type="number" id="hIn" placeholder="height">
+        </div>
+        <div class="lockrow">
+          <input type="checkbox" id="lock" checked>
+          <label for="lock" style="margin:0;">Lock aspect ratio</label>
+        </div>
+      </div>
+
+      <div class="compare">
+        <div class="size before">
+          <div class="n" id="beforeSize">—</div>
+          <div class="l">before</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="size after">
+          <div class="n" id="afterSize">—</div>
+          <div class="l">after</div>
+        </div>
+      </div>
+
+      <button class="go" id="goBtn" disabled>Convert &amp; download</button>
+      <div class="note" id="pngNote" style="display:none;">PNG is lossless — the quality slider won't shrink it further. Reduce dimensions instead to cut file size.</div>
+
+    </div>
+
+  </div>
+</div>
+
+<a class="dl" id="dlLink"></a>
+
+<script>
+(function(){
+  const drop = document.getElementById('drop');
+  const fileInput = document.getElementById('fileInput');
+  const hint = document.getElementById('hint');
+  const preview = document.getElementById('preview');
+  const origInfo = document.getElementById('origInfo');
+  const origDims = document.getElementById('origDims');
+  const formatsWrap = document.getElementById('formats');
+  const qualitySlider = document.getElementById('quality');
+  const qVal = document.getElementById('qVal');
+  const qualityField = document.getElementById('qualityField');
+  const pngNote = document.getElementById('pngNote');
+  const wIn = document.getElementById('wIn');
+  const hIn = document.getElementById('hIn');
+  const lock = document.getElementById('lock');
+  const beforeSize = document.getElementById('beforeSize');
+  const afterSize = document.getElementById('afterSize');
+  const goBtn = document.getElementById('goBtn');
+  const dlLink = document.getElementById('dlLink');
+
+  let img = new Image();
+  let origW = 0, origH = 0, origBytes = 0, origName = 'image';
+  let selectedFormat = 'image/jpeg';
+  let debounceTimer = null;
+
+  function fmtBytes(b){
+    if (!b && b !== 0) return '—';
+    if (b < 1024) return b + ' B';
+    if (b < 1024*1024) return (b/1024).toFixed(1) + ' KB';
+    return (b/1024/1024).toFixed(2) + ' MB';
+  }
+
+  function openPicker(){ fileInput.click(); }
+  drop.addEventListener('click', openPicker);
+
+  ['dragenter','dragover'].forEach(evt=>{
+    drop.addEventListener(evt, e=>{
+      e.preventDefault(); e.stopPropagation();
+      drop.classList.add('drag');
+    });
+  });
+  ['dragleave','drop'].forEach(evt=>{
+    drop.addEventListener(evt, e=>{
+      e.preventDefault(); e.stopPropagation();
+      drop.classList.remove('drag');
+    });
+  });
+  drop.addEventListener('drop', e=>{
+    const f = e.dataTransfer.files[0];
+    if (f) loadFile(f);
+  });
+  fileInput.addEventListener('change', e=>{
+    const f = e.target.files[0];
+    if (f) loadFile(f);
+  });
+
+  function loadFile(file){
+    if (!file.type.startsWith('image/')) return;
+    origBytes = file.size;
+    origName = file.name.replace(/\.[^.]+$/, '') || 'image';
+    const reader = new FileReader();
+    reader.onload = e=>{
+      img = new Image();
+      img.onload = ()=>{
+        origW = img.naturalWidth;
+        origH = img.naturalHeight;
+        preview.src = e.target.result;
+        preview.style.display = 'block';
+        hint.style.display = 'none';
+        origInfo.textContent = fmtBytes(origBytes);
+        origDims.textContent = origW + ' × ' + origH + ' px';
+        beforeSize.textContent = fmtBytes(origBytes);
+        wIn.value = origW;
+        hIn.value = origH;
+        goBtn.disabled = false;
+        scheduleEstimate();
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  formatsWrap.addEventListener('click', e=>{
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    [...formatsWrap.children].forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedFormat = btn.dataset.fmt;
+    const isPng = selectedFormat === 'image/png';
+    pngNote.style.display = isPng ? 'block' : 'none';
+    qualitySlider.disabled = isPng;
+    qualityField.style.opacity = isPng ? '0.4' : '1';
+    scheduleEstimate();
+  });
+
+  qualitySlider.addEventListener('input', ()=>{
+    qVal.textContent = qualitySlider.value + '%';
+    scheduleEstimate();
+  });
+
+  let ratio = 1;
+  wIn.addEventListener('input', ()=>{
+    if (lock.checked && origW) {
+      ratio = origH / origW;
+      hIn.value = Math.round(wIn.value * ratio);
+    }
+    scheduleEstimate();
+  });
+  hIn.addEventListener('input', ()=>{
+    if (lock.checked && origH) {
+      ratio = origW / origH;
+      wIn.value = Math.round(hIn.value * ratio);
+    }
+    scheduleEstimate();
+  });
+
+  function scheduleEstimate(){
+    clearTimeout(debounceTimer);
+    if (!origW) return;
+    debounceTimer = setTimeout(renderCanvas, 200);
+  }
+
+  function buildCanvas(){
+    const w = Math.max(1, parseInt(wIn.value) || origW);
+    const h = Math.max(1, parseInt(hIn.value) || origH);
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, w, h);
+    return canvas;
+  }
+
+  function renderCanvas(){
+    if (!origW) return;
+    const canvas = buildCanvas();
+    const q = selectedFormat === 'image/png' ? undefined : (qualitySlider.value / 100);
+    canvas.toBlob(blob=>{
+      if (!blob) return;
+      afterSize.textContent = fmtBytes(blob.size);
+      const pct = origBytes ? Math.round((1 - blob.size / origBytes) * 100) : 0;
+    }, selectedFormat, q);
+  }
+
+  goBtn.addEventListener('click', ()=>{
+    if (!origW) return;
+    const canvas = buildCanvas();
+    const q = selectedFormat === 'image/png' ? undefined : (qualitySlider.value / 100);
+    canvas.toBlob(blob=>{
+      if (!blob) return;
+      const ext = selectedFormat === 'image/jpeg' ? 'jpg' : selectedFormat === 'image/webp' ? 'webp' : 'png';
+      const url = URL.createObjectURL(blob);
+      dlLink.href = url;
+      dlLink.download = origName + '-converted.' + ext;
+      dlLink.click();
+      afterSize.textContent = fmtBytes(blob.size);
+      setTimeout(()=>URL.revokeObjectURL(url), 4000);
+    }, selectedFormat, q);
+  });
+
+})();
+</script>
+
+</body>
+</html>
